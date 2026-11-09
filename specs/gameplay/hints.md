@@ -1,7 +1,7 @@
 ---
 area: gameplay
 file: hints
-status: done
+status: approved
 ---
 
 # gameplay/hints - Check and reveal
@@ -34,7 +34,8 @@ Each player may ask only a few times in a short while.
 ### Requests
 
 2. A check, a reveal or a ballot is input (it wakes an idle player,
-   `social/presence.md`); the edit rate limit counts none of them. A check or a
+   `social/presence.md`); the edit rate limit (`platform/fair-play.md`) counts
+   none of them. A check or a
    reveal, whatever its target, meets the hint limit first: when its sender
    already has `RoomConfig.hint_limit` (5) counted requests in the last
    `hint_window_seconds` (10) seconds (sliding: those after now − 10), it is
@@ -209,7 +210,8 @@ The Aide groups, `_design/room.md`, « Aide menu »; the strike and the notch,
   `client/room.md`. Cell marks: `gameplay/viewport.md`; pending edits:
   `gameplay/board.md`.
   Completion: `gameplay/rules.md`. The stream and its lines' look:
-  `social/chat.md`. Protocol and fair play: `platform/realtime.md`. The recap's
+  `social/chat.md`. Protocol: `platform/realtime.md`; fair play:
+  `platform/fair-play.md`. The recap's
   counts: `gameplay/results.md`.
 
 ## Code

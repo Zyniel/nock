@@ -1,7 +1,7 @@
 ---
 area: lobby
 file: rooms
-status: done
+status: approved
 ---
 
 # lobby/rooms - Solo start, room creation and invitation
@@ -231,7 +231,7 @@ status band of « Connection lost »; before, the entry card of
   `platform/realtime.md` rules 2 and 26; the app
   parsing `X-Forwarded-For` itself; changing the creation limit from `/ops`.
   Web Share, QR codes, offline play.
-- Fair play: `platform/realtime.md`; reconnection: `platform/reconnection.md`. Durable state:
+- Fair play: `platform/fair-play.md`; reconnection: `platform/reconnection.md`. Durable state:
   `platform/server.md`. Feed lines of joins and departures:
   `social/presence.md`. The Menu and sheets: `client/menus.md`; the top bar:
   `client/hud.md`.

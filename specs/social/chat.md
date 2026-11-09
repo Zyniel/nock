@@ -1,7 +1,7 @@
 ---
 area: social
 file: chat
-status: done
+status: approved
 ---
 
 # social/chat - Chat, the stream and mute
@@ -145,7 +145,7 @@ The examples use FX-01 (`specs/_reference.md`) with Ana (`p1`, host), Bob
 - **AC-14** A chat text is held only in its room's stored rows and in no log
   record; `<b>salut</b>` and the nickname `<img src=x>` show as text, creating
   no element; every frame of a full game with chat passes the traffic checks of
-  `platform/realtime.md` once chat texts, each one a client sent, are set
+  `platform/fair-play.md` once chat texts, each one a client sent, are set
   aside. (← 022 AC-8, 022 AC-13, 022 AC-14)
 - **AC-15** Six messages from Ana at once: five pass, the sixth is dropped
   without answer, one at +9.9 s too, one at +10 s passes; Bob's limit is his
@@ -217,7 +217,7 @@ The examples use FX-01 (`specs/_reference.md`) with Ana (`p1`, host), Bob
 - A live « word completed » line: only a catch-up shows one
   (`social/catch-up.md`).
 - « Salon », its tabs and dot, the 3-second notes: `client/room.md`. Who may
-  mute: `lobby/host.md`. Edit limits: `platform/realtime.md`.
+  mute: `lobby/host.md`. Edit limits: `platform/fair-play.md`.
 
 ## Code
 

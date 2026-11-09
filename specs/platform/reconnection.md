@@ -1,7 +1,7 @@
 ---
 area: platform
 file: reconnection
-status: done
+status: approved
 ---
 
 # platform/reconnection - Stale edits, the resume window, the page's connection
@@ -30,7 +30,7 @@ a loss, retries and sends what it held.
    stale. A live `confirm_pencil` also carries the page's seq
    (`gameplay/co-op.md`). With `base_seq` b, the edit is `stale_edit` when the
    cell last changed after b by another player; else it applies as a live
-   edit. The rate limit (`platform/realtime.md` rule 24) comes before the
+   edit. The rate limit (`platform/fair-play.md` rule 2) comes before the
    letter-cell check, which comes before `cell_locked`, then staleness (the
    full order: `gameplay/co-op.md`).
 
@@ -168,8 +168,8 @@ The connection band follows `_design/room.md`, « Connection lost ».
   room's seq is never stale; edits that reached the server before the loss are
   resent and apply again with no visible change (AC-2).
 - A cell locked since the edit gets `cell_locked`, not `stale_edit`; with the
-  limit reached, `rate_limited` comes before both (AC-2; `platform/realtime.md`
-  AC-12).
+  limit reached, `rate_limited` comes before both (AC-2; `platform/fair-play.md`
+  AC-2).
 - Two tabs never take the room from each other in a loop: 4001 is final (AC-3).
 - A page hidden on a dead network keeps its socket until it is visible again,
   unless a close event comes first (AC-6).
@@ -180,8 +180,8 @@ The connection band follows `_design/room.md`, « Connection lost ».
 
 ## Out of scope
 
-- The socket, its messages and close codes, the silence check, the join
-  deadline and the edit rate: `platform/realtime.md`.
+- The socket, its messages and close codes, the silence check and the join
+  deadline: `platform/realtime.md`. The edit rate: `platform/fair-play.md`.
 - The join's steps, takeover with 4001, past players and the seat back:
   `lobby/joining.md`. Host hand-over on a time-out: `lobby/host.md`.
 - The page's seq buffer and its other connection states: `client/shell.md`.

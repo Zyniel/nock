@@ -54,7 +54,8 @@ table, the naming rules and the glossary follow in the same change.
 | admin | `admin/operations.md` | logs, metrics, retention, the operator token, the ops API | | 038 AC-3 to AC-6, AC-10, AC-11 |
 | admin | `admin/ops-page.md` | the `/ops` page: the token form and its states, the dashboard card and its period chips, the replay of a room's edits | pages | 038 AC-7 to AC-9; 048 AC-6 to AC-12 |
 | admin | `admin/overrides.md` | the `/ops` overrides of the room lives and the sweep interval: effective value, settings routes, dry run, storage, the settings card | pages | |
-| platform | `platform/realtime.md` | room events protocol, fair play | | 039, 037; 017 AC-4; 040 AC-8 to AC-13 |
+| platform | `platform/realtime.md` | room events protocol: the socket, the messages, order and delivery, the silence check, the grid view's hyphen marks | | 039 (but AC-14 to AC-17); 037 AC-2; 017 AC-4; 040 AC-8, AC-10 to AC-13 |
+| platform | `platform/fair-play.md` | answer-free payloads, the edit rate, text never inserted as HTML | | 037 AC-1, AC-3, AC-4; 039 AC-14 to AC-17; 040 AC-9 |
 | platform | `platform/reconnection.md` | stale edits, the resume window, the page's connection: heartbeat, losses, retries, resends | room | 017 AC-1 to AC-3, AC-5 |
 | platform | `platform/server.md` | durable state, undo, building the app | | 018; 036 AC-12 |
 | platform | `platform/live-rooms.md` | the rooms held in memory: live from the first socket to the last, the socket's one lookup, the step's time budgets | | |

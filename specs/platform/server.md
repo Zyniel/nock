@@ -1,7 +1,7 @@
 ---
 area: platform
 file: server
-status: done
+status: approved
 ---
 
 # platform/server - Durable rooms, undo, building the app
@@ -100,7 +100,7 @@ take back their last edit.
       then empty.
 
    A refusal goes to the sender alone. Undo is one level and is not counted in
-   the edit rate.
+   the edit rate (`platform/fair-play.md`).
 9. The page: « Annuler » (`room.undo`), shown once joined, sends `undo`; so do
    Control+z and Meta+z while the grid has the focus, their default prevented;
    all until the grid is solved, when they send nothing and the button is

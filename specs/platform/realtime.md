@@ -1,15 +1,15 @@
 ---
 area: platform
 file: realtime
-status: done
+status: approved
 ---
 
-# platform/realtime - Room events and fair play
+# platform/realtime - Room events
 
 ## Purpose
 
 The browser and the server talk over one WebSocket per room, in one validated
-contract. No browser receives an answer letter before the room earns it.
+contract.
 
 ## Depends on
 
@@ -89,8 +89,9 @@ contract. No browser receives an answer letter before the room earns it.
    snapshot lists at most 8 players. A reveal targets a letter or a word, a check
    also the grid.
 10. Error codes (19), each with the domain that gives it its meaning:
-    `invalid_message`, `not_joined`, `rate_limited`, `not_a_letter_cell` (this
-    file); `stale_edit` (`platform/reconnection.md`); `room_full`,
+    `invalid_message`, `not_joined`, `not_a_letter_cell` (this file);
+    `rate_limited` (`platform/fair-play.md`); `stale_edit`
+    (`platform/reconnection.md`); `room_full`,
     `invalid_nickname` (`lobby/joining.md`); `room_locked`, `removed`,
     `not_host`, `invalid_target` (`lobby/host.md`); `cell_locked`
     (`gameplay/co-op.md`); `nothing_to_undo` (`platform/server.md`);
@@ -140,29 +141,6 @@ contract. No browser receives an answer letter before the room earns it.
     count. A disconnected player's resume window is `platform/reconnection.md`
     rule 2.
 
-### Fair play
-
-23. The server never adds an answer to a payload, HTTP or WebSocket: no key
-    `answer` or `solution`, and no letter at a cell before it is earned there,
-    by a player's accepted edit at that cell or by a reveal (`gameplay/hints.md`).
-    An answer's letters reach a browser only where players put them (accepted
-    letters, chat texts, nicknames) or a reveal put them, or by chance in
-    random ids, tokens and codes. The snapshot's grid holds clue texts and
-    arrows, never answers. Its letter cells carry two hyphen marks,
-    `hyphen_right` and `hyphen_down`, false unless a word of the grid has a
-    break (`content/grids.md` rule 4) right after that cell, across or down;
-    a mark names an edge between two letters and never a letter.
-24. Edits (`edit_letter`, `erase`, `pencil_edit`, `confirm_pencil`) are limited
-    to 20 per player in any sliding second; one more is `rate_limited`, and a
-    refused edit does not count. The client stays connected. `undo` and
-    `select_cell` are not counted.
-25. A page inserts every nickname, chat text and clue text as text, never as
-    HTML: no `{@html` block in a `.svelte` file under `web/src` (whitespace or a
-    line break after `{` included), and none of `innerHTML`, `outerHTML`,
-    `insertAdjacentHTML`, `document.write`, `parseFromString`,
-    `createContextualFragment`, `setHTMLUnsafe` or `srcdoc` in its `.ts` and
-    `.svelte` files.
-
 ### Sockets per address
 
 26. The cap of rule 2 is `NOCK_SOCKETS_PER_ADDRESS`, a whole number of sockets
@@ -172,6 +150,14 @@ contract. No browser receives an answer letter before the room earns it.
     and stops on a refused value (`platform/serving.md` rules 6, 10). An app
     reads it each time it starts and fails its start with `SettingsError` on a
     refused value; each app keeps its counts in memory. `/ops` cannot change it.
+
+### The grid view
+
+27. The snapshot's letter cells carry two hyphen marks, `hyphen_right` and
+    `hyphen_down`, false unless a word of the grid has a break
+    (`content/grids.md` rule 4) right after that cell, across or down; a mark
+    names an edge between two letters and never a letter. What the view never
+    carries is `platform/fair-play.md` rule 1.
 
 ## Acceptance criteria
 
@@ -196,11 +182,6 @@ contract. No browser receives an answer letter before the room earns it.
 - **AC-5** A `letter_changed` with seq 0, -1 or none is refused and one with seq
   1 parses; a `pong` with seq 5 is refused; a snapshot parses with seq 0 or 42.
   (← 039 AC-11, 039 AC-12, 039 AC-13)
-- **AC-6** The view of FX-01 has 25 cells in grid order, its 18 letter cells
-  empty, its clue at (0, 0) « Passoire fine » then « De la marine »; its JSON
-  holds neither `answer` nor `TAMIS`, no snapshot field is named `answer` or
-  `solution`, and a clue sent with an `answer` is refused. (← 039 AC-14,
-  039 AC-15, 039 AC-16, 039 AC-17)
 - **AC-7** On a fresh FX-01 room, a join as `Ana`, text or binary, gets a
   snapshot with seq 1, the empty grid view, Ana alone as host, help `free`, a
   budget of 5 letters and 1 word, no chat and the timer at 0, stopped; a second
@@ -218,17 +199,6 @@ contract. No browser receives an answer letter before the room earns it.
   `not_a_letter_cell`, and an unjoined socket's edit gets `not_joined`; the seq
   stays and the other client receives nothing, while `T` at (1, 0) from the
   joined client reaches both. (← 037 AC-2)
-- **AC-12** 25 edits sent at one instant give 20 `letter_changed`, which the
-  other client receives too, and 5 `rate_limited`; the next edit 1 second later
-  is accepted, and a second player is never held by the first one's count.
-  (← 037 AC-3)
-- **AC-13** In a full FX-01 game, with three wrong letters corrected, an erase
-  and a late joiner, no frame or HTTP body breaks rule 23, and the late joiner's
-  snapshot holds exactly the 9 letters typed before it. (← 037 AC-1,
-  040 AC-9)
-- **AC-14** Players named `<b>Eve</b>` and `<img src=x>` show in the roster as
-  the texts `<b>eve</b>` and `<img Src=x>`, with no `b` or `img` element and no
-  dialog; the static scan finds no banned construct. (← 037 AC-4)
 - **AC-15** A player silent for 5.9 seconds stays active; at 6 the other client
   gets `player_state_changed` `disconnected` and the silent socket closes with
   4408; a socket the client closes is seen with no wait, and the other page's
@@ -261,9 +231,6 @@ contract. No browser receives an answer letter before the room earns it.
   binary frames it receives (`client/shell.md`).
 - A frame of 4,097 bytes with few characters is still refused (AC-9).
 - A player who only pings, or only sends invalid frames, is never silent (AC-15).
-- A typed letter replaced later stays earned at that cell, never at another
-  (AC-13); a revealed letter is earned when its `cell_locked` is sent, not
-  before (`gameplay/hints.md`).
 - A room stored while answers held letters only (`VIDE`) snapshots with every
   mark false (AC-20).
 - An honest page pings every 2 seconds, so it never meets the join deadline,
@@ -285,12 +252,9 @@ contract. No browser receives an answer letter before the room earns it.
 - Durable state across a restart, the log and undo: `platform/server.md`.
   Stalled, flooding and oversized sockets: `product.md`. What changed while
   away: `social/catch-up.md`.
-- Throttling other messages: chat, `social/chat.md`; reactions,
-  `social/reactions.md`; checks and
-  reveals, `gameplay/hints.md`; wrong codes, `lobby/rooms.md`; `undo`,
-  `select_cell`, ballots and the rest are not limited.
-- Peer-to-peer sync, a leave message, message acknowledgements, a Content
-  Security Policy.
+- Answer-free payloads, the edit rate, text never inserted as HTML, and the
+  throttles of the other messages: `platform/fair-play.md`.
+- Peer-to-peer sync, a leave message, message acknowledgements.
 
 ## Code
 
@@ -300,8 +264,9 @@ contract. No browser receives an answer letter before the room earns it.
   the join deadline of `RoomConnection`, `MAX_FRAME_BYTES`.
   `src/nock/server.py`: the socket route, the sockets per address.
   `src/nock/settings.py`, `src/nock/__main__.py`: the variable.
-- `src/nock/room.py`: `tick`, `disconnect_player`, the edit checks, the rate
-  limit; `RoomConfig` holds the silence, join deadline and rate values.
-- Tests: `tests/test_spec_039_*`, `tests/test_spec_017_ac04_*`,
-  `tests/test_spec_037_*`, `tests/test_spec_040_ac07_ac13_*`;
-  `tests/test_realtime_*` for AC-20 to AC-23.
+- `src/nock/room.py`: `tick`, `disconnect_player`, the edit checks;
+  `RoomConfig` holds the silence and join deadline values.
+- Tests: `tests/test_spec_039_*` (but `tests/test_spec_039_ac14_ac17_*`),
+  `tests/test_spec_017_ac04_*`, `tests/test_spec_037_ac02_*`,
+  `tests/test_spec_040_ac07_ac13_*` (but its AC-9); `tests/test_realtime_*`
+  for AC-20 to AC-23.
