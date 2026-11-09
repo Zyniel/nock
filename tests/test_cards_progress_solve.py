@@ -27,12 +27,12 @@ from playwright.sync_api import Page, Route, expect
 
 from cards_harness import (
     ACCOUNT_PROGRESS_KEY,
+    PROGRESS_KEY,
     ROOM_SOCKET_PATTERN,
     stored_object,
     tap_play,
     wait_for_stored,
 )
-from library_harness import PROGRESS_KEY
 from nock.grid import Grid
 from nock.protocol import GridSolved
 from spec010_harness import MockRoomSocket, send_snapshot, settle
