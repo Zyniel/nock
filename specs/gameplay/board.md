@@ -1,7 +1,7 @@
 ---
 area: gameplay
 file: board
-status: done
+status: approved
 ---
 
 # gameplay/board - Selection, typing and the in-app keyboard
@@ -14,7 +14,8 @@ one, and the player may hide it.
 
 ## Depends on
 
-- `gameplay/co-op.md`: what a letter or erase sends and shows, pencil mode.
+- `gameplay/pencil.md`: what a letter sends and shows, pencil mode; the page's
+  grid and its pending edits are `gameplay/co-op.md`.
 - `gameplay/rules.md`: the solved page's input lock and the status's place.
 - `platform/realtime.md`: the snapshot and `select_cell`.
 
@@ -62,7 +63,7 @@ The grid itself (cells, arrows, cursors, zoom, the viewport):
    (`gameplay/rules.md` rule 6). A key handled here is prevented, Backspace
    even with nothing selected, so it never leaves the room.
 10. A letter L on the selected cell: on a locked cell, nothing. Else the cell
-    shows L at once and the edit is sent (`gameplay/co-op.md` rule 8), unless
+    shows L at once and the edit is sent (`gameplay/pencil.md` rule 2), unless
     it already shows L with the mode's pencil flag; sent or not, the selection
     then moves to the word's next unlocked cell, filled or not, or stays at
     the end.
@@ -93,7 +94,7 @@ The grid itself (cells, arrows, cursors, zoom, the viewport):
     Backspace, once per press however long. ⇄ (`keyboard.swap`, « Changer de
     sens ») taps the selected cell (rule 6.2). With nothing selected these do
     nothing. ✎ (`pencil.toggle`, « Crayon ») flips pencil mode
-    (`gameplay/co-op.md` rule 7), pressed while on; hiding the keyboard keeps
+    (`gameplay/pencil.md` rule 1), pressed while on; hiding the keyboard keeps
     the mode.
 16. « Clavier » is a top-bar button on a touch screen only. There the phone top
     bar (sheet layout, or any window at most 500 px high, `client/hud.md`) has
@@ -217,8 +218,9 @@ The grid itself (cells, arrows, cursors, zoom, the viewport):
 - The separator in the clue bar, the announcement or a length pattern.
 - The grid's cells, arrows, cursors, fit, zoom, the viewport following the
   selection, hyphen edges: `gameplay/viewport.md`. The selection after a
-  reload: `lobby/rooms.md`. Others' selections: `social/presence.md`. Edits,
-  pencil letters: `gameplay/co-op.md`. Top bar, clue bar buttons:
+  reload: `lobby/rooms.md`. Others' selections: `social/presence.md`. Edits:
+  `gameplay/co-op.md`; pencil mode, confirming: `gameplay/pencil.md`. Top bar,
+  clue bar buttons:
   `client/hud.md`; the Menu: `client/menus.md`. Grid roles: `product.md`.
 
 ## Code

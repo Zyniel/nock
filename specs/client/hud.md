@@ -1,7 +1,7 @@
 ---
 area: client
 file: hud
-status: done
+status: approved
 ---
 
 # client/hud - The room's frame: top bar, clue bar, play area
@@ -44,7 +44,8 @@ its sheet.
 4. Phone top bar: the timer slot, « Annuler », « Aide », « Salon », a fourth
    button, « Menu ». On any touch screen the fourth is « Clavier » and the bar
    has no « Crayon »; elsewhere it is « Crayon ». There the ✎ key of the in-app
-   keyboard (`gameplay/board.md`) toggles pencil mode, only while the keyboard
+   keyboard (`gameplay/board.md`) toggles pencil mode (`gameplay/pencil.md`),
+   only while the keyboard
    shows: with the keyboard hidden by « Clavier », the player has no way to
    change the mode. Computer top bar: the brand (`client/shell.md` rule 17),
    the timer slot, « Annuler », « Crayon », « Aide », « Salon », « Clavier » on

@@ -34,7 +34,8 @@ table, the naming rules and the glossary follow in the same change.
 | lobby | `lobby/lifetime.md` | room lifetime: the kinds of room and their lives, when a room expires, the sweep that deletes it, the five variables | | 032 AC-1, AC-2 |
 | gameplay | `gameplay/board.md` | word selection, letter entry, navigation, in-app keyboard, the display switches | cells, room | 007, 008, 009, 044; 042 AC-3, AC-11, AC-19 |
 | gameplay | `gameplay/viewport.md` | the grid's drawing, cursors, fit, zoom, following the selection, hyphen edges | cells, foundation | 006; 042 (but AC-3, AC-11, AC-19) |
-| gameplay | `gameplay/co-op.md` | shared letters, same-cell conflicts, pencil letters | cells, room | 015, 016, 020 |
+| gameplay | `gameplay/co-op.md` | shared letters, same-cell conflicts, the page's grid and pending edits | cells, room | 015, 016 |
+| gameplay | `gameplay/pencil.md` | pencil mode, the pencil controls, confirming a pencil letter | cells, room | 020 |
 | gameplay | `gameplay/rules.md` | completion, shared timer | room, overlays | 026, 027 |
 | gameplay | `gameplay/hints.md` | check, reveal, the reveal budget, the hint limit, the Aide items | cells, room | 023, 024; 025 AC-1, AC-4 |
 | gameplay | `gameplay/votes.md` | the group vote on a grid check or a reveal, its banner | room, overlays | 025 AC-2, AC-3, AC-5 to AC-9; 047 AC-1 to AC-5, AC-13, AC-14 |
@@ -132,7 +133,7 @@ writes it); nothing of race or teams is built.
   one takes the next free number.
 - A criterion is proven by a test named `test_acN_...` in `tests/test_<name>_*.py`
   or `tests/test_<name>.py`, where `<name>` is the `file` value with `-` written
-  `_` (`co-op` gives `tests/test_co_op_pencil.py`). Shared helpers of a domain's
+  `_` (`co-op` gives `tests/test_co_op_error_answers.py`). Shared helpers of a domain's
   tests go in `tests/<name>_harness.py`.
 - Or by a pointer `(← NNN AC-n, ...)`: the tests of those numbered criteria in
   `tests/test_spec_NNN_*.py` prove it. A pointer says which tests prove the
@@ -215,6 +216,7 @@ writes it); nothing of race or teams is built.
 | viewport | « Grille » (the grid's scroll area: the part of the grid the page shows at its zoom and scroll) | `GridViewport.svelte`, `gridLayout.ts` |
 | foundation, state line | (not shown: the tokens, fonts, icons, components and focus ring every screen is built from; the one line a page shows while waiting, empty, failed or done) | `app.css`, `icons.ts`, `--nock-*` |
 | hints | « Aide »: « Vérifier », « Révéler » | `check`, `reveal` |
+| pencil mode, pencil letter, confirm | « Crayon » (✎), « Confirmer la lettre au crayon » (`gameplay/pencil.md`) | `pencil_edit`, `confirm_pencil`, `pencil.toggle`, `pencil.confirm` |
 | vote, ballot | « … propose de vérifier la grille », « Oui » / « Non » (the group's decision on a grid check or a reveal; one player's yes or no) | `vote_opened`, `vote_closed`; `vote` |
 | authorship | « Auteurs » (`social/authorship.md`) | `authors` |
 | clue flag, reaction, picker | « Je bloque » (a player's flag on a clue where help is wanted), « Réagir » and its picker (an emoji on a word, shown on its clue for 3 s); `social/reactions.md` | `flag`, `flag_changed`, `react`, `reaction`, `clueFlags.ts`, `ReactionPicker.svelte` |
