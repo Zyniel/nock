@@ -1,10 +1,10 @@
 ---
 id: B-112
 title: shell's typeless frame in one criterion
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-06T13:46:00Z'
-updated_date: '2026-11-09T04:50:00Z'
+updated_date: '2026-11-09T18:03:00Z'
 labels:
   - domain:shell
 milestone: m-11
@@ -22,6 +22,8 @@ From DRAFT-083 (B-097's review). client/shell.md AC-7 lists {"seq": 6} among the
 <!-- AC:BEGIN -->
 - [ ] #1 The typeless frame is in one criterion of shell.md, its test proves it, and the other criterion no longer lists it
 - [ ] #2 AC-36's binary case is proven without waiting a fixed delay
+- [ ] #3 shell AC-7 (changed)
+- [ ] #4 shell AC-36 (changed)
 <!-- AC:END -->
 
 ## Definition of Done
@@ -33,3 +35,17 @@ From DRAFT-083 (B-097's review). client/shell.md AC-7 lists {"seq": 6} among the
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Specs: specs/client/shell.md (AC-7, AC-36)
+Tests: tests/test_shell_*.py proving AC-7 and AC-36
+Gate: uv run python scripts/gate.py --specs shell --browsers chromium
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Lead: AC-36 keeps the typeless frame, AC-7 drops it. The 040 test's {"type": 3, "seq": 6} frame stays as it is (outside B-112); proving rule 3's string type properly goes to a follow-up draft.
+<!-- SECTION:NOTES:END -->
