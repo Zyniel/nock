@@ -17,8 +17,8 @@ that with MIME selected on (2, 2) every Aide item is enabled before the close (t
 test checks it). After a close 4001, « Annuler » and the five items of « Vérifier »
 and « Révéler » are disabled with the disabled look (their label in
 `--nock-muted`, `_design/foundation.md` « Components »), and a forced press on any
-sends nothing and leaves the Aide menu open (rule 9); with (1, 0) selected, the
-confirm item is disabled alike.
+sends nothing and leaves the Aide menu open (`client/menus.md` rule 2); with
+(1, 0) selected, the confirm item is disabled alike.
 
 AC-30: Ana's page on AC-29's snapshot with MIME selected on Bob's `I` at (2, 2),
 after a close 4001. Backspace leaves `I` and the selection on (2, 2); ArrowDown

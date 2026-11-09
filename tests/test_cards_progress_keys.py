@@ -21,11 +21,12 @@ import json
 import pytest
 from playwright.sync_api import Page
 
-from cards_harness import ACCOUNT_PROGRESS_KEY, open_grid
-from library_harness import (
+from cards_harness import (
+    ACCOUNT_PROGRESS_KEY,
     PROGRESS_KEY,
     expect_progress,
     expect_progresses,
+    open_grid,
 )
 from spec032_harness import seed_storage
 from spec046_harness import SIGNED_OUT, accounts_on, open_catalogue

@@ -113,6 +113,6 @@ room they are no member of.
 - `web/src/lib/myRooms.ts`, `web/src/lib/MyRooms.svelte`: « Mes salons »;
   `FocusableLink.svelte`: its links.
 - Tests: those of the pointers, in `tests/test_spec_032_ac04_*`,
-  `tests/test_spec_032_ac05_*`, `tests/test_spec_032_ac03_ac05_*` (AC-5),
-  `tests/test_spec_032_ac06_*`, `tests/test_spec_046_ac11_ac13_*` (AC-11,
+  `tests/test_spec_032_ac05_*`, `tests/test_spec_032_ac03_ac05_*` (032 AC-5),
+  `tests/test_spec_032_ac06_*`, `tests/test_spec_046_ac11_ac13_*` (046 AC-11,
   AC-12); `tests/test_summaries_*` for later criteria.
