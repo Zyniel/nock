@@ -1,9 +1,9 @@
 ---
-id: DRAFT-076
-title: Window sizes named in my-account criteria
+id: DRAFT-100
+title: Specs still over the size guide after Tidy specs 2
 status: Draft
 assignee: []
-created_date: '2026-11-05T22:21:00Z'
+created_date: '2026-11-09T04:50:00Z'
 labels:
   - follow-up
 dependencies: []
@@ -12,7 +12,7 @@ dependencies: []
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-From B-084's reviewer: account/my-account.md AC-2, AC-4 and AC-8 name window sizes (1280 by 720, 360 by 740, 320 by 568), the test mechanics _map.md « What a spec holds » keeps out of specs. They were copied as they were in the split. m-7's close review found the same in client/hud.md (15 times), client/menus.md (7), and board, viewport, rules and others: if the rule applies everywhere, this draft covers all of them. For m-8.
+What B-115 (from DRAFT-079) leaves: client/hud.md 15.9 KB (also DRAFT-084), social/catch-up.md 21 criteria, gameplay/rules.md 15.6 KB with 20, lobby/joining.md 15.5 KB, gameplay/viewport.md 21 criteria, admin/operations.md 15.1 KB, admin/overrides.md 20 criteria, client/shell.md 21 criteria, specs/_design/cells.md 18.1 KB, foundation.md 27.5 KB, room.md 19.9 KB. specs/product.md is DRAFT-052. A future 'Spec splits 3' bet.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Definition of Done
